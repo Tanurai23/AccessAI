@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "AccessAI",
+  "version": "0.1.0",
+  "description": "AI Accessibility Auditor",
+  "permissions": ["activeTab"],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
