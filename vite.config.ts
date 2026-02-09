@@ -4,11 +4,10 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
+    outDir: "popup/dist",
+    emptyOutDir: true,
     rollupOptions: {
-      input: {
-        popup: "popup.html"
-      }
+      input: "popup/index.html",
     },
-    outDir: "dist"
-  }
+  },
 });

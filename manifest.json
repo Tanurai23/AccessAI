@@ -5,11 +5,13 @@
   "description": "Real-time WCAG scanning + AI auto-fixes",
   "permissions": ["activeTab", "storage"],
   "action": {
-    "default_popup": "popup/index.html"
+    "default_popup": "popup/dist/index.html"
   },
+
   "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  }
+  "16": "icon16.png",
+  "48": "icon48.png",
+  "128": "icon128.png"
+}
+
 }
