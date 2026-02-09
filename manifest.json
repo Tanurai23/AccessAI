@@ -5,9 +5,9 @@
 
   "permissions": ["tabs", "activeTab"],
 
-  "action": {
-    "default_popup": "popup/index.html"
-  },
+ "action": {
+  "default_popup": "popup/dist/index.html"
+},
 
   "content_scripts": [
     {
