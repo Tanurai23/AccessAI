@@ -1,20 +1,18 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["DOM", "ES2020"],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "moduleResolution": "bundler",
-
     "jsx": "react-jsx",
-
-    "esModuleInterop": true,
+    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-
-    "strict": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "noEmit": true,
     "skipLibCheck": true,
-
-    "outDir": "popup/dist"
+    "resolveJsonModule": true,
+    "strict": false
   },
-
-  "include": ["popup/src"]
+  "include": ["popup/src/**/*"],
+  "exclude": ["node_modules", "dist", "popup/dist", "content.ts"]
 }
