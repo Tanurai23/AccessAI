@@ -1,22 +1,35 @@
 {
   "manifest_version": 3,
-  "name": "AccessAI Scanner", 
-  "version": "1.0.2",
-  "description": "AI-powered WCAG accessibility scanner",
-  "permissions": ["tabs", "activeTab", "storage", "scripting"],
-  "host_permissions": ["<all_urls>"],
+  "name": "AccessAI Scanner",
+  "version": "1.0.0",
+  "description": "AI-powered accessibility auditor with 12 WCAG rules",
+  
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
   "action": {
     "default_popup": "popup/dist/index.html",
     "default_title": "AccessAI Scanner"
   },
-  "icons": {
-  "16": "icons/icon16.png",
-  "48": "icons/icon48.png", 
-  "128": "icons/icon128.png"
-},
+
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["content.js"],
-    "run_at": "document_idle"
-  }]
+    "run_at": "document_idle",
+    "all_frames": false
+  }],
+
+  "icons": {
+    "16": "public/icon16.png",
+    "48": "public/icon48.png",
+    "128": "public/icon128.png"
+  }
 }

@@ -8,43 +8,70 @@ export interface AuditIssue {
   element: string;
   description: string;
   fixed: boolean;
-  aiSuggestion?: string;  // 🔥 NEW: AI Alt Text
 }
 
 const App: React.FC = () => {
   const [issues, setIssues] = React.useState<AuditIssue[]>([]);
   const [isScanning, setIsScanning] = React.useState(false);
-
-  // ... [scanPage function UNCHANGED - keep your existing code]
+  const [error, setError] = React.useState<string>('');
 
   const scanPage = () => {
     console.log("🚀 Scan button clicked");
     setIsScanning(true);
+    setError('');
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs[0]?.id) {
         console.error("❌ No active tab");
+        setError("No active tab found");
         setIsScanning(false);
         return;
       }
 
-      console.log("📤 Sending message to tab:", tabs[0].id);
+      const tabId = tabs[0].id;
+      console.log("📤 Sending scan message to tab:", tabId);
 
-      chrome.tabs.sendMessage(tabs[0].id, { action: "scan" }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("❌ Message error:", chrome.runtime.lastError.message);
-          setIsScanning(false);
-          return;
+      // First, try to inject the content script if it's not already there
+      chrome.scripting.executeScript(
+        {
+          target: { tabId: tabId },
+          files: ['content.js']
+        },
+        () => {
+          if (chrome.runtime.lastError) {
+            console.log("Content script already injected or error:", chrome.runtime.lastError.message);
+          }
+
+          // Now send the scan message
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tabId, { action: "scan" }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error("❌ Message error:", chrome.runtime.lastError.message);
+                setError(`Failed to scan: ${chrome.runtime.lastError.message}`);
+                setIsScanning(false);
+                return;
+              }
+
+              console.log("✅ Full response:", response);
+              
+              if (response?.error) {
+                setError(response.error);
+                setIssues([]);
+              } else {
+                const foundIssues = response?.issues || [];
+                console.log("📊 Found issues:", foundIssues.length);
+                setIssues(foundIssues);
+                
+                if (foundIssues.length === 0) {
+                  setError("No accessibility issues detected on this page");
+                }
+              }
+              
+              setIsScanning(false);
+            });
+          }, 100);
         }
-
-        console.log("✅ Full response:", response);
-        
-        const issues = response?.issues || [];
-        console.log("📊 Extracted issues:", issues.length);
-        
-        setIssues(issues);
-        setIsScanning(false);
-      });
+      );
     });
   };
 
@@ -58,77 +85,89 @@ const App: React.FC = () => {
   };
 
   const wcagRulesCovered = new Set(issues.map(i => i.type)).size;
-  const aiSuggestionsCount = issues.filter(i => i.aiSuggestion).length;  // 🔥 NEW
 
   return (
-    <div className="w-96 p-5 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-lg shadow-2xl">
+    <div style={{ minWidth: '400px', minHeight: '500px' }} className="p-5 bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-2xl">
       <h1 className="text-2xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
-        AccessAI
+        AccessAI Scanner
       </h1>
       
       <button
         onClick={scanPage}
         disabled={isScanning}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-bold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all mb-4 disabled:opacity-50 disabled:cursor-not-allowed text-base"
       >
         {isScanning ? '⏳ Scanning...' : '🔍 Scan Current Page'}
       </button>
 
-      {/* 🔥 NEW: AI METRICS + shadcn-style Cards */}
+      {/* ERROR MESSAGE */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+          <p className="text-sm text-red-200">⚠️ {error}</p>
+        </div>
+      )}
+
+      {/* METRICS DASHBOARD */}
       {totalIssues > 0 && (
-        <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+        <div className="mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
           <h2 className="text-lg font-semibold mb-3 text-purple-300">📊 Audit Metrics</h2>
           
-          {/* 🔥 3-COL GRID METRICS CARDS */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-gradient-to-br from-red-900/30 to-red-800/20 p-3 rounded-lg border border-red-500/30 text-center">
-              <div className="text-xl font-bold text-red-300">{severityCounts.critical}</div>
-              <div className="text-xs text-red-200">Critical</div>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="bg-slate-900/50 p-3 rounded text-center">
+              <div className="text-3xl font-bold text-white">{totalIssues}</div>
+              <div className="text-xs text-slate-400">Total Issues</div>
             </div>
-            
-            <div className="bg-gradient-to-br from-orange-900/30 to-orange-800/20 p-3 rounded-lg border border-orange-500/30 text-center">
-              <div className="text-xl font-bold text-orange-300">{severityCounts.high}</div>
-              <div className="text-xs text-orange-200">High</div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 p-3 rounded-lg border border-green-500/30 text-center">
-              <div className="text-xl font-bold text-green-300">{aiSuggestionsCount}</div>
-              <div className="text-xs text-green-200">🤖 AI Fixes</div>
+            <div className="bg-slate-900/50 p-3 rounded text-center">
+              <div className="text-3xl font-bold text-purple-400">{wcagRulesCovered}</div>
+              <div className="text-xs text-slate-400">WCAG Rules</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-slate-900/50 p-2 rounded text-center">
-              <div className="font-bold text-white">{totalIssues}</div>
-              <div className="text-slate-400">Total Issues</div>
-            </div>
-            <div className="bg-slate-900/50 p-2 rounded text-center">
-              <div className="font-bold text-purple-400">{wcagRulesCovered}</div>
-              <div className="text-slate-400">WCAG Rules</div>
-            </div>
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-slate-300 mb-2">Severity Breakdown:</div>
+            
+            {severityCounts.critical > 0 && (
+              <div className="flex items-center justify-between bg-red-900/20 px-3 py-2 rounded">
+                <span className="text-sm text-red-300">🔴 Critical</span>
+                <span className="text-base font-bold text-red-400">{severityCounts.critical}</span>
+              </div>
+            )}
+            
+            {severityCounts.high > 0 && (
+              <div className="flex items-center justify-between bg-orange-900/20 px-3 py-2 rounded">
+                <span className="text-sm text-orange-300">🟠 High</span>
+                <span className="text-base font-bold text-orange-400">{severityCounts.high}</span>
+              </div>
+            )}
+            
+            {severityCounts.medium > 0 && (
+              <div className="flex items-center justify-between bg-yellow-900/20 px-3 py-2 rounded">
+                <span className="text-sm text-yellow-300">🟡 Medium</span>
+                <span className="text-base font-bold text-yellow-400">{severityCounts.medium}</span>
+              </div>
+            )}
+            
+            {severityCounts.low > 0 && (
+              <div className="flex items-center justify-between bg-green-900/20 px-3 py-2 rounded">
+                <span className="text-sm text-green-300">🟢 Low</span>
+                <span className="text-base font-bold text-green-400">{severityCounts.low}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* ISSUES LIST */}
-      <div className="space-y-2 max-h-80 overflow-y-auto">
-        {issues.length === 0 ? (
-          <p className="text-slate-400 text-sm italic text-center py-4">
-            {isScanning ? 'Analyzing page...' : 'Click scan to detect accessibility issues'}
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        {issues.length === 0 && !error && !isScanning && (
+          <p className="text-slate-400 text-sm italic text-center py-6">
+            Click scan to detect accessibility issues
           </p>
-        ) : (
-          issues.map((issue) => (
-            <div key={issue.id} className="group">
-              <Badge issue={issue} />
-              {/* 🔥 AI SUGGESTION DISPLAY */}
-              {issue.aiSuggestion && (
-                <div className="ml-4 mt-1 p-2 bg-green-900/50 border border-green-500/30 rounded text-xs text-green-200 group-hover:bg-green-800/50 transition-all">
-                  💡 AI Fix: "{issue.aiSuggestion}"
-                </div>
-              )}
-            </div>
-          ))
         )}
+        
+        {issues.map((issue) => (
+          <Badge key={issue.id} issue={issue} />
+        ))}
       </div>
     </div>
   );

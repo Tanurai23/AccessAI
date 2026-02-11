@@ -1,4 +1,4 @@
-// content.ts - 12 WCAG Rules Scanner
+// content.ts - 12 WCAG Rules Scanner + AI Alt Text
 console.log("✅ Content script loaded");
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action !== "scan")
@@ -7,12 +7,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try {
         const issues = [];
         // =========================
-        // RULE 1: Missing alt text (WCAG 1.1.1)
+        // 🔥 RULE 1: Missing alt text + AI SUGGESTIONS (WCAG 1.1.1)
         // =========================
         const images = Array.from(document.images);
+        const missingAlt = [];
         images.forEach((img, index) => {
             const alt = img.getAttribute("alt");
             if (!alt || !alt.trim() || alt === img.src) {
+                missingAlt.push(img); // Collect for AI
                 issues.push({
                     id: `alt-${index}`,
                     type: "alt",
@@ -23,8 +25,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         });
+        // 🔥 AI Alt Text Generation (MVP - Mock for Day 4)
+        const mockAIAltText = (src) => {
+            if (src.includes('profile') || src.includes('avatar'))
+                return 'User profile photo';
+            if (src.includes('logo'))
+                return 'Company logo';
+            if (src.includes('twitter') || src.includes('x.com'))
+                return 'Social media icon';
+            return `Image: ${src.split('/').pop()?.split('.')[0]?.replace(/-/g, ' ') || 'graphic'}`;
+        };
+        // Add AI suggestions to FIRST 3 missing alt issues
+        const altIssues = issues.filter(i => i.type === 'alt');
+        missingAlt.slice(0, 3).forEach((img, i) => {
+            if (altIssues[i]) {
+                altIssues[i].aiSuggestion = mockAIAltText(img.src);
+            }
+        });
         // =========================
-        // RULE 2: Low contrast (WCAG 1.4.3)
+        // RULE 2-12: [ALL YOUR EXISTING RULES - UNCHANGED]
         // =========================
         const textElements = document.querySelectorAll("p, span, h1, h2, h3, a, button, label");
         textElements.forEach((el, index) => {
@@ -43,9 +62,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
             catch { }
         });
-        // =========================
-        // RULE 3: Focus visibility (WCAG 2.4.7)
-        // =========================
         const focusables = document.querySelectorAll('a, button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
         focusables.forEach((el, index) => {
             try {
@@ -63,9 +79,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
             catch { }
         });
-        // =========================
-        // RULE 4: Missing landmarks (WCAG 1.3.1)
-        // =========================
         if (!document.querySelector("main, [role='main']")) {
             issues.push({
                 id: "landmark-main",
@@ -96,9 +109,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 fixed: false,
             });
         }
-        // =========================
-        // RULE 5: Heading hierarchy (WCAG 1.3.1)
-        // =========================
         const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"));
         let lastLevel = 0;
         headings.forEach((heading, index) => {
@@ -115,9 +125,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
             lastLevel = level;
         });
-        // =========================
-        // RULE 6: Form labels (WCAG 1.3.1, 3.3.2)
-        // =========================
         const inputs = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select');
         inputs.forEach((input, index) => {
             const id = input.getAttribute("id");
@@ -135,9 +142,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         });
-        // =========================
-        // RULE 7: Link text (WCAG 2.4.4)
-        // =========================
         const links = document.querySelectorAll("a");
         links.forEach((link, index) => {
             const text = link.textContent?.trim() || "";
@@ -163,9 +167,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         });
-        // =========================
-        // RULE 8: Page language (WCAG 3.1.1)
-        // =========================
         const htmlElement = document.documentElement;
         if (!htmlElement.getAttribute("lang")) {
             issues.push({
@@ -177,9 +178,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 fixed: false,
             });
         }
-        // =========================
-        // RULE 9: ARIA usage (WCAG 4.1.2)
-        // =========================
         const ariaElements = document.querySelectorAll("[aria-hidden]");
         ariaElements.forEach((el, index) => {
             const ariaHidden = el.getAttribute("aria-hidden");
@@ -195,9 +193,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         });
-        // =========================
-        // RULE 10: Semantic HTML (WCAG 1.3.1)
-        // =========================
         const divButtons = document.querySelectorAll('div[onclick], span[onclick]');
         divButtons.forEach((el, index) => {
             issues.push({
@@ -209,9 +204,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 fixed: false,
             });
         });
-        // =========================
-        // RULE 11: Keyboard accessibility (WCAG 2.1.1)
-        // =========================
         const clickableNonButtons = document.querySelectorAll('div[onclick]:not([tabindex]), span[onclick]:not([tabindex])');
         clickableNonButtons.forEach((el, index) => {
             issues.push({
@@ -223,9 +215,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 fixed: false,
             });
         });
-        // =========================
-        // RULE 12: Table structure (WCAG 1.3.1)
-        // =========================
         const tables = document.querySelectorAll("table");
         tables.forEach((table, index) => {
             const hasHeaders = table.querySelector("th");
@@ -252,7 +241,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         });
-        console.log("✅ Scan complete:", issues.length, "issues");
+        console.log("✅ Scan complete:", issues.length, "issues", "🧠 AI suggestions:", issues.filter(i => i.aiSuggestion).length);
         sendResponse({ issues });
     }
     catch (err) {

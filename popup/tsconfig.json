@@ -11,8 +11,13 @@
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "strict": false
+    "strict": false,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["popup/src/*"]
+    }
   },
-  "include": ["popup/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "popup/dist", "content.ts"]
 }
