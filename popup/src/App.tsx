@@ -1,190 +1,134 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from './Badge';
 
-export interface AuditIssue {
-  id: string;
-  type: 'alt' | 'contrast' | 'focus' | 'landmark' | 'heading' | 'form-label' | 'link-text' | 'lang' | 'aria' | 'semantic' | 'keyboard' | 'table';
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  element: string;
-  description: string;
-  fixed: boolean;
-  aiSuggestion?: string; // 🔥 AI Alt Text
-}
-
 const App: React.FC = () => {
-  const [issues, setIssues] = React.useState<AuditIssue[]>([]);
-  const [isScanning, setIsScanning] = React.useState(false);
-  const [error, setError] = React.useState<string>('');
+  const [issues, setIssues] = useState<AuditIssue[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  const scanPage = () => {
-    console.log("🚀 Scan button clicked");
-    setIsScanning(true);
-    setError('');
+  const scanPage = async () => {
+  console.log("🚀 SCAN STARTED");
+  setIsScanning(true);
+  setError('');
+  setIssues([]);
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]?.id) {
-        console.error("❌ No active tab");
-        setError("No active tab found");
-        setIsScanning(false);
-        return;
-      }
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("No active tab");
+    if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
+      throw new Error("Cannot scan chrome:// pages. Try twitter.com or a normal website");
+    }
 
-      const tabId = tabs[0].id;
-      const tabUrl = tabs[0].url || '';
-      
-      console.log("📤 Sending scan message to tab:", tabId, tabUrl);
+    console.log("📤 Injecting content script into tab:", tab.id, tab.url);
 
-      // Check if URL is scannable
-      if (tabUrl.startsWith('chrome://') || tabUrl.startsWith('chrome-extension://') || tabUrl.startsWith('edge://')) {
-        setError("Cannot scan browser internal pages. Try https://example.com");
-        setIsScanning(false);
-        return;
-      }
-
-      // Inject content script
-      chrome.scripting.executeScript(
-        {
-          target: { tabId: tabId },
-          files: ['content.js']
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            console.log("Script injection:", chrome.runtime.lastError.message);
-          }
-
-          // Wait then send message
-          setTimeout(() => {
-            chrome.tabs.sendMessage(tabId, { action: "scan" }, (response) => {
-              if (chrome.runtime.lastError) {
-                console.error("❌ Error:", chrome.runtime.lastError.message);
-                setError(`Scan failed: ${chrome.runtime.lastError.message}. Refresh page & try again.`);
-                setIsScanning(false);
-                return;
-              }
-
-              console.log("✅ Response:", response);
-              
-              if (response?.error) {
-                setError(response.error);
-                setIssues([]);
-              } else {
-                const foundIssues = response?.issues || [];
-                console.log("📊 Issues:", foundIssues.length);
-                console.log("🧠 AI:", foundIssues.filter((i: AuditIssue) => i.aiSuggestion).length);
-                
-                setIssues(foundIssues);
-                
-                if (foundIssues.length === 0) {
-                  setError("✅ No issues detected!");
-                }
-              }
-              
-              setIsScanning(false);
-            });
-          }, 200);
-        }
-      );
+    // Inject content script dynamically
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["popup/dist/content.js"]
     });
-  };
 
-  // Metrics
-  const totalIssues = issues.length;
-  const aiSuggestions = issues.filter(i => i.aiSuggestion).length;
-  const severityCounts = {
+    // Wait 50ms to ensure listener is ready
+    await new Promise(r => setTimeout(r, 50));
+
+    // Send scan message
+    const response = await chrome.tabs.sendMessage(tab.id, { action: "scan" });
+    console.log("📥 Response:", response);
+
+    if (response?.error) {
+      setError(response.error);
+    } else if (response?.issues) {
+      setIssues(response.issues);
+      if (response.issues.length === 0) setError("✅ Perfect! No accessibility issues found.");
+    } else {
+      setError("No response from scanner");
+    }
+  } catch (err: any) {
+    console.error("❌ FULL ERROR:", err);
+    const msg = err.message || "Connection failed. Refresh page & retry.";
+    setError(`Scan failed: ${msg}`);
+  } finally {
+    setIsScanning(false);
+  }
+};
+
+  const stats = {
+    total: issues.length,
+    ai: issues.filter(i => i.aiSuggestion).length,
     critical: issues.filter(i => i.severity === 'critical').length,
-    high: issues.filter(i => i.severity === 'high').length,
-    medium: issues.filter(i => i.severity === 'medium').length,
-    low: issues.filter(i => i.severity === 'low').length,
   };
-  const wcagRulesCovered = new Set(issues.map(i => i.type)).size;
 
   return (
-    <div style={{ minWidth: '420px', minHeight: '550px' }} className="p-5 bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-2xl">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
-          AccessAI
-        </h1>
-        {aiSuggestions > 0 && (
-          <span className="text-xs bg-gradient-to-r from-green-500 to-emerald-500 px-2 py-1 rounded-full font-semibold">
-            🧠 AI
-          </span>
-        )}
-      </div>
-      
-      <button
-        onClick={scanPage}
+    <div style={{ 
+      width: '420px', 
+      padding: '20px', 
+      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', 
+      color: 'white', 
+      fontFamily: 'system-ui, sans-serif' 
+    }}>
+      <h1 style={{ 
+        fontSize: '24px', 
+        fontWeight: 'bold', 
+        background: 'linear-gradient(90deg, #a78bfa 0%, #ec4899 100%)',
+        WebkitBackgroundClip: 'text', 
+        WebkitTextFillColor: 'transparent',
+        margin: '0 0 20px 0'
+      }}>
+        AccessAI Scanner
+      </h1>
+
+      <button 
+        onClick={scanPage} 
         disabled={isScanning}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all mb-4 disabled:opacity-50 text-base"
+        style={{ 
+          width: '100%', 
+          background: isScanning ? '#6b7280' : 'linear-gradient(90deg, #9333ea 0%, #ec4899 100%)',
+          color: 'white', 
+          padding: '14px', 
+          borderRadius: '12px', 
+          border: 'none', 
+          fontSize: '16px', 
+          fontWeight: '600',
+          cursor: isScanning ? 'not-allowed' : 'pointer',
+          marginBottom: '20px'
+        }}
       >
-        {isScanning ? '⏳ Scanning...' : '🔍 Scan Page'}
+        {isScanning ? '⏳ Scanning...' : `🔍 Scan Page (${stats.ai > 0 ? `🧠 AI Ready` : ''})`}
       </button>
 
       {error && (
-        <div className={`mb-4 p-3 rounded-lg border ${error.startsWith('✅') ? 'bg-green-900/30 border-green-500/50' : 'bg-red-900/30 border-red-500/50'}`}>
-          <p className={`text-sm ${error.startsWith('✅') ? 'text-green-200' : 'text-red-200'}`}>{error}</p>
+        <div style={{ 
+          padding: '12px 16px', 
+          borderRadius: '8px', 
+          marginBottom: '16px',
+          background: error.includes('✅') ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+          border: `2px solid ${error.includes('✅') ? '#22c55e' : '#ef4444'}`,
+          color: error.includes('✅') ? '#22c55e' : '#fca5a5'
+        }}>
+          {error}
         </div>
       )}
 
-      {/* shadcn-style Cards */}
-      {totalIssues > 0 && (
-        <div className="mb-4">
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <div className="bg-slate-800/50 border border-slate-700 p-3 rounded-lg text-center">
-              <div className="text-2xl font-bold">{totalIssues}</div>
-              <div className="text-xs text-slate-400">Issues</div>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700 p-3 rounded-lg text-center">
-              <div className="text-2xl font-bold text-purple-400">{wcagRulesCovered}</div>
-              <div className="text-xs text-slate-400">Rules</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-900/40 to-emerald-900/40 border border-green-700/50 p-3 rounded-lg text-center">
-              <div className="text-2xl font-bold text-green-300">{aiSuggestions}</div>
-              <div className="text-xs text-green-400">🧠 AI</div>
-            </div>
+      {issues.length > 0 && (
+        <div style={{ marginBottom: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ background: 'rgba(30,58,138,0.3)', padding: '16px', borderRadius: '12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#a78bfa' }}>{stats.total}</div>
+            <div style={{ fontSize: '12px', opacity: 0.8 }}>Total Issues</div>
           </div>
-
-          <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
-            <div className="text-xs font-semibold text-slate-300 mb-2">Severity:</div>
-            <div className="grid grid-cols-2 gap-2">
-              {severityCounts.critical > 0 && (
-                <div className="flex justify-between bg-red-900/20 px-2 py-1.5 rounded border border-red-800/30">
-                  <span className="text-xs text-red-300">🔴 Critical</span>
-                  <span className="text-sm font-bold text-red-400">{severityCounts.critical}</span>
-                </div>
-              )}
-              {severityCounts.high > 0 && (
-                <div className="flex justify-between bg-orange-900/20 px-2 py-1.5 rounded border border-orange-800/30">
-                  <span className="text-xs text-orange-300">🟠 High</span>
-                  <span className="text-sm font-bold text-orange-400">{severityCounts.high}</span>
-                </div>
-              )}
-              {severityCounts.medium > 0 && (
-                <div className="flex justify-between bg-yellow-900/20 px-2 py-1.5 rounded border border-yellow-800/30">
-                  <span className="text-xs text-yellow-300">🟡 Medium</span>
-                  <span className="text-sm font-bold text-yellow-400">{severityCounts.medium}</span>
-                </div>
-              )}
-              {severityCounts.low > 0 && (
-                <div className="flex justify-between bg-green-900/20 px-2 py-1.5 rounded border border-green-800/30">
-                  <span className="text-xs text-green-300">🟢 Low</span>
-                  <span className="text-sm font-bold text-green-400">{severityCounts.low}</span>
-                </div>
-              )}
-            </div>
+          <div style={{ background: 'rgba(34,197,94,0.3)', padding: '16px', borderRadius: '12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#22c55e' }}>{stats.ai}</div>
+            <div style={{ fontSize: '12px', opacity: 0.8 }}>🧠 AI Fixes</div>
           </div>
         </div>
       )}
 
-      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-        {issues.length === 0 && !error && !isScanning && (
-          <div className="text-center py-8 text-slate-400">
-            <div className="text-4xl mb-2">🔍</div>
-            <p className="text-sm italic">Click scan</p>
+      <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+        {issues.length === 0 && !isScanning && !error && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔍</div>
+            <p>Click Scan to audit WCAG compliance</p>
           </div>
         )}
-        {issues.map((issue) => (
-          <Badge key={issue.id} issue={issue} />
-        ))}
+        {issues.map(issue => <Badge key={issue.id} issue={issue} />)}
       </div>
     </div>
   );

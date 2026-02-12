@@ -16,13 +16,12 @@
   ],
 
   "action": {
-    "default_popup": "popup/dist/index.html",
-    "default_title": "AccessAI Scanner"
+    "default_popup": "popup/dist/index.html"
   },
 
   "content_scripts": [{
     "matches": ["<all_urls>"],
-    "js": ["content.js"],
+    "js": ["popup/dist/content.js"],
     "run_at": "document_idle",
     "all_frames": false
   }],

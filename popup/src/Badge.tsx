@@ -1,56 +1,117 @@
 import React from 'react';
-import { AuditIssue } from './App';
+import { AuditIssue } from "./types";
 
 interface BadgeProps {
   issue: AuditIssue;
 }
 
 export const Badge: React.FC<BadgeProps> = ({ issue }) => {
-  const severityColors = {
-    critical: 'bg-red-500 border-red-400',
-    high: 'bg-orange-500 border-orange-400',
-    medium: 'bg-yellow-500 border-yellow-400',
-    low: 'bg-green-500 border-green-400'
+  const severityStyles = {
+    critical: { bg: 'rgba(127, 29, 29, 0.2)', border: '#dc2626', color: '#fca5a5' },
+    high: { bg: 'rgba(124, 45, 18, 0.2)', border: '#ea580c', color: '#fdba74' },
+    medium: { bg: 'rgba(113, 63, 18, 0.2)', border: '#ca8a04', color: '#fde047' },
+    low: { bg: 'rgba(20, 83, 45, 0.2)', border: '#16a34a', color: '#86efac' }
   };
 
   const typeIcons: Record<string, string> = {
-    alt: '🖼️',
-    contrast: '🌓',
-    focus: '🎯',
-    landmark: '🗺️',
-    heading: '📋',
-    'form-label': '📝',
-    'link-text': '🔗',
-    lang: '🌐',
-    aria: '♿',
-    semantic: '🏗️',
-    keyboard: '⌨️',
-    table: '📊'
+    alt: '🖼️', contrast: '🌓', focus: '🎯', landmark: '🗺️',
+    heading: '📋', 'form-label': '📝', 'link-text': '🔗', lang: '🌐',
+    aria: '♿', semantic: '🏗️', keyboard: '⌨️', table: '📊'
   };
 
+  const style = severityStyles[issue.severity] || severityStyles.low;
+
   return (
-    <div className={`p-3 rounded-lg border-2 ${severityColors[issue.severity || 'low']} bg-opacity-20 backdrop-blur-sm shadow-md hover:shadow-lg transition-all`}>
-      <div className="flex items-start gap-3">
-        <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${severityColors[issue.severity || 'low']}`}>
-          <div className="w-2 h-2 bg-white rounded-full mt-0.5 ml-0.5 animate-pulse"></div>
+    <div style={{
+      padding: '12px',
+      borderRadius: '8px',
+      border: `2px solid ${style.border}`,
+      background: style.bg,
+      marginBottom: '8px',
+      backdropFilter: 'blur(4px)'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
+        <div style={{
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          background: style.border,
+          marginTop: '4px',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: 'white',
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+          }}></div>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm capitalize flex items-center gap-2">
+        
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontWeight: '600',
+            fontSize: '13px',
+            textTransform: 'capitalize',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: style.color
+          }}>
             <span>{typeIcons[issue.type] || '⚠️'}</span>
             <span>{issue.type.replace('-', ' ')}</span>
           </div>
-          <div className="text-xs opacity-80 mt-1">{issue.description}</div>
+          
+          <div style={{
+            fontSize: '12px',
+            opacity: 0.8,
+            marginTop: '4px',
+            color: '#e2e8f0'
+          }}>
+            {issue.description}
+          </div>
+          
           {issue.element !== 'document' && (
-            <div className="text-xs opacity-60 mt-1 font-mono truncate">{issue.element}</div>
+            <div style={{
+              fontSize: '11px',
+              opacity: 0.6,
+              marginTop: '4px',
+              fontFamily: 'monospace',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: '#cbd5e1'
+            }}>
+              {issue.element}
+            </div>
           )}
           
-          {/* 🔥 AI SUGGESTION */}
           {issue.aiSuggestion && (
-            <div className="mt-2 p-2 bg-gradient-to-r from-green-900/40 to-emerald-900/40 border border-green-700/50 rounded text-xs">
-              <div className="flex items-center gap-1 mb-1">
-                <span className="text-green-300">🧠 AI Suggestion:</span>
+            <div style={{
+              marginTop: '8px',
+              padding: '8px',
+              background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.5)',
+              borderRadius: '6px',
+              fontSize: '12px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginBottom: '4px'
+              }}>
+                <span style={{ color: '#6ee7b7' }}>🧠 AI Suggestion:</span>
               </div>
-              <div className="text-green-100 italic">"{issue.aiSuggestion}"</div>
+              <div style={{
+                color: '#d1fae5',
+                fontStyle: 'italic'
+              }}>
+                "{issue.aiSuggestion}"
+              </div>
             </div>
           )}
         </div>

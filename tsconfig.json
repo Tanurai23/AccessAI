@@ -8,11 +8,18 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "allowJs": true,
-    "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "strict": false
+    "strict": false,
+
+    "outDir": "./popup/dist",
+    "rootDir": "./popup",
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["popup/src/*"]
+    }
   },
-  "include": [],
-  "exclude": ["node_modules", "dist", "popup"]
+  "include": ["popup/src/**/*"],
+  "exclude": ["node_modules", "popup/dist"]
 }
