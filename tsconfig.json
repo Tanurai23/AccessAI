@@ -14,5 +14,5 @@
     "strict": false
   },
   "include": [],
-  "exclude": ["node_modules", "dist", "popup", "content.ts"]
+  "exclude": ["node_modules", "dist", "popup"]
 }
