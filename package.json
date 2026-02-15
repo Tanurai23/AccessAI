@@ -3,15 +3,15 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  
   "scripts": {
-    "dev": "vite",
-    "build": "npm run build:content && npm run build:popup",
-    "build:content": "cp content.js dist-popup/",
-    "build:popup": "cd popup && npm run build"
+    "dev": "cd popup && vite",
+    "build": "npm run build:popup && npm run build:content",
+    "build:popup": "cd popup && vite build",
+    "build:content": "tsc --project tsconfig.json"
   },
+  
   "dependencies": {
-    "@radix-ui/react-dialog": "^1.1.15",
-    "@radix-ui/react-progress": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@xenova/transformers": "^2.17.2",
     "class-variance-authority": "^0.7.1",
@@ -22,6 +22,7 @@
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7"
   },
+  
   "devDependencies": {
     "@types/chrome": "^0.1.36",
     "@types/node": "^25.2.3",
