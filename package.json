@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "cd popup && vite",
     "build": "npm run build:popup && npm run build:content",
-    "build:popup": "cd popup && vite build",
-    "build:content": "tsc --project tsconfig.json"
+    "build:popup": "cd popup && vite build && cd ..",
+    "build:content": "npx tsc content.ts --outDir . --target ES2020"
   },
   
   "dependencies": {
