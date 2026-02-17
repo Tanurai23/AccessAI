@@ -1,7 +1,8 @@
-// popup/src/content.ts - PRODUCTION AUTO-FIX ENGINE
-console.log("✅ AccessAI content script LOADED v2.0");
+console.log("✅ AccessAI content script LOADED v2.1 - VISION AI");
 
-// Interfaces
+// 🔥 IMPORT AI (Day 9)
+let aiInitialized = false;
+
 interface AuditIssue {
   id: string;
   type: 'alt' | 'contrast' | 'focus' | 'landmark' | 'heading' | 'form-label' | 'link-text' | 'lang' | 'aria' | 'semantic' | 'keyboard' | 'table';
@@ -18,11 +19,10 @@ interface FixAction {
   aiText?: string[];
 }
 
-// 🔥 AUTO-FIX FUNCTIONS
+// 🔥 AUTO-FIX FUNCTIONS (Enhanced)
 const applyContrastFix = (elements: Element[]) => {
   elements.forEach(el => {
     const style = el as HTMLElement;
-    // Force accessible contrast (black on white)
     style.style.setProperty('color', '#000000', 'important');
     style.style.setProperty('background-color', '#FFFFFF', 'important');
     style.style.setProperty('text-shadow', 'none', 'important');
@@ -31,7 +31,6 @@ const applyContrastFix = (elements: Element[]) => {
 };
 
 const applyFocusFix = () => {
-  // Global focus styles
   const style = document.createElement('style');
   style.id = 'accessai-focus-fix';
   style.textContent = `
@@ -40,29 +39,32 @@ const applyFocusFix = () => {
       outline-offset: 2px !important;
       border-radius: 4px !important;
     }
-    *:focus:not(:focus-visible) {
-      outline: none !important;
-    }
   `;
-  // Remove existing if present
   document.getElementById('accessai-focus-fix')?.remove();
   document.head.appendChild(style);
   console.log('✅ Global focus indicators applied');
 };
 
-const applyAltFix = (images: HTMLImageElement[], aiText: string[]) => {
-  images.slice(0, aiText.length).forEach((img, i) => {
-    img.alt = aiText[i] || 'AI-generated description';
-    img.setAttribute('aria-label', aiText[i] || 'Image');
-    console.log(`✅ Fixed alt text: ${aiText[i]?.substring(0, 30)}`);
-  });
+const applyAltFix = async (images: HTMLImageElement[], aiTexts: string[]) => {
+  for (let i = 0; i < Math.min(images.length, aiTexts.length); i++) {
+    const img = images[i];
+    img.alt = aiTexts[i];
+    img.setAttribute('aria-label', aiTexts[i]);
+    // Visual feedback
+    img.style.border = '3px solid #10B981';
+    img.style.transition = 'border 0.3s';
+    setTimeout(() => {
+      img.style.border = '';
+    }, 3000);
+    console.log(`✅ AI Alt applied: ${aiTexts[i]?.substring(0, 30)}`);
+  }
 };
 
-// 🚀 MAIN FIX APPLIER
-const applyFixes = (fixRequest: { fixes: FixAction[] }) => {
-  console.log('🔧 Applying fixes:', fixRequest.fixes);
+// 🔥 MAIN FIX APPLIER
+const applyFixes = async (fixRequest: { fixes: FixAction[] }) => {
+  console.log('🔧 Applying AI fixes:', fixRequest.fixes);
   
-  fixRequest.fixes.forEach(fix => {
+  for (const fix of fixRequest.fixes) {
     switch (fix.type) {
       case 'contrast':
         applyContrastFix(fix.elements);
@@ -71,94 +73,125 @@ const applyFixes = (fixRequest: { fixes: FixAction[] }) => {
         applyFocusFix();
         break;
       case 'alt':
-        // Find images during scan
-        const images = Array.from(document.images).slice(0, 3);
-        applyAltFix(images as HTMLImageElement[], fix.aiText || []);
+        // Use document images for alt fixes
+        const images = Array.from(document.querySelectorAll('img:not([alt]):not([aria-label])')) as HTMLImageElement[];
+        await applyAltFix(images.slice(0, 5), fix.aiText || []);
         break;
     }
-  });
+  }
   
-  // Auto re-scan after 1s
-  setTimeout(() => {
-    chrome.runtime.sendMessage({ action: 'rescan' });
-  }, 1000);
+  setTimeout(() => chrome.runtime.sendMessage({ action: 'rescan' }), 1500);
 };
 
-// GLOBAL REGISTRATION
+// 🔥 REAL AI ALT SCANNER (Day 9)
+const scanMissingAltAI = async (): Promise<AuditIssue[]> => {
+  const images = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
+  const missingAlt = images.filter(img => 
+    !img.alt?.trim() || img.alt === img.src
+  );
+  
+  console.log(`🤖 AI scanning ${missingAlt.length} images...`);
+  const issues: AuditIssue[] = [];
+  
+  // Process top 8 images (performance)
+  for (let i = 0; i < Math.min(8, missingAlt.length); i++) {
+    const img = missingAlt[i];
+    try {
+      console.log(`🤖 Analyzing image ${i + 1}:`, img.src.slice(-40));
+      const aiText = await (window as any).generateAltText(img);
+      
+      issues.push({
+        id: `ai-alt-${i}`,
+        type: 'alt',
+        severity: 'critical',
+        element: img.src.substring(img.src.lastIndexOf('/') + 1),
+        description: 'Image missing meaningful alt text',
+        fixed: false,
+        aiSuggestion: aiText
+      });
+    } catch (e) {
+      console.warn(`❌ AI failed for image ${i}:`, e);
+      // Fallback mock
+      issues.push({
+        id: `alt-${i}`,
+        type: 'alt',
+        severity: 'critical',
+        element: img.src.substring(img.src.lastIndexOf('/') + 1),
+        description: 'Image missing alt text',
+        fixed: false,
+        aiSuggestion: 'AI-generated description'
+      });
+    }
+  }
+  
+  return issues;
+};
+
+// 🔥 FULL SCANNER
+const runFullScan = async (): Promise<{issues: AuditIssue[], total: number}> => {
+  console.log('🔍 Starting full AI scan...');
+  
+  // Init AI first time
+  if (!aiInitialized) {
+    try {
+      await (window as any).initAI();
+      aiInitialized = true;
+    } catch (e) {
+      console.error('❌ AI init failed:', e);
+    }
+  }
+  
+  const issues: AuditIssue[] = [];
+  
+  // 🔥 AI Alt Text (Priority #1)
+  const aiAlts = await scanMissingAltAI();
+  issues.push(...aiAlts);
+  
+  // Additional rules (mock for now → expand Day 10+)
+  issues.push(
+    { id: "contrast-1", type: "contrast", severity: "high", element: "Text", description: "Low contrast detected", fixed: false },
+    { id: "focus-1", type: "focus", severity: "medium", element: "Buttons", description: "Missing focus outlines", fixed: false },
+    { id: "landmark-1", type: "landmark" as any, severity: "low", element: "Page", description: "Missing main landmark", fixed: false }
+  );
+  
+  console.log(`✅ Scan COMPLETE: ${issues.length} issues (${aiAlts.length} AI-powered)`);
+  return { issues, total: issues.length };
+};
+
+// 🔥 MESSAGE HANDLER
 (window as any).registerAccessAIScan = () => {
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: any) => {
     console.log("📩 REQUEST:", request.action);
 
-    // SCAN REQUEST
     if (request.action === "scan" || request.action === "rescan") {
-      console.log("🔍 Starting scan...");
-      sendResponse({ status: "scanning", progress: 0 });
-
-      setTimeout(() => {
-        try {
-          const issues: AuditIssue[] = [];
-
-          // RULE 1: Missing Alt + AI (WCAG 1.1.1)
-          const images = Array.from(document.images);
-          const missingAlt: HTMLImageElement[] = [];
-
-          images.forEach((img, index) => {
-            const alt = img.getAttribute("alt");
-            if (!alt || !alt.trim() || alt === img.src) {
-              missingAlt.push(img);
-              issues.push({
-                id: `alt-${index}`,
-                type: "alt",
-                severity: "critical",
-                element: img.src.substring(0, 50) + "...",
-                description: "Image missing meaningful alt text",
-                fixed: false,
-              });
-            }
-          });
-
-          // AI Suggestions (Production mock → real Transformers.js Day 9)
-          const mockAIAltText = (src: string): string => {
-            if (src.includes('profile') || src.includes('avatar')) return 'User profile photo';
-            if (src.includes('logo')) return 'Company logo';
-            if (src.includes('twitter') || src.includes('x.com')) return 'Social media icon';
-            return `Image: ${src.split('/').pop()?.split('.')[0]?.replace(/-/g, ' ') || 'graphic'}`;
-          };
-
-          missingAlt.slice(0, 3).forEach((img, i) => {
-            const altIssue = issues.find(issue => issue.id === `alt-${i}`);
-            if (altIssue) altIssue.aiSuggestion = mockAIAltText(img.src);
-          });
-
-          // Additional test issues (expand to full 12 later)
-          issues.push(
-            { id: "test-lang", type: "lang" as any, severity: "high", element: "HTML", description: "Page missing lang attribute", fixed: false },
-            { id: "test-main", type: "landmark" as any, severity: "low", element: "document", description: "Missing main landmark", fixed: false },
-            { id: "test-contrast-1", type: "contrast", severity: "high", element: "P", description: "Low contrast text detected", fixed: false },
-            { id: "test-focus-1", type: "focus", severity: "medium", element: "BUTTON", description: "No focus outline", fixed: false }
-          );
-
-          console.log(`✅ Scan COMPLETE: ${issues.length} issues found`);
-          sendResponse({ issues, total: issues.length });
-        } catch (error) {
-          console.error("❌ Scan error:", error);
-          sendResponse({ error: "Scan failed: " + (error as Error).message });
-        }
-      }, 800);
-
-    // 🔥 NEW: FIX REQUEST
+      runFullScan().then(sendResponse).catch(e => {
+        console.error("❌ Scan error:", e);
+        sendResponse({ error: "Scan failed" });
+      });
+      
     } else if (request.action === "apply-fixes") {
-      console.log("🔧 FIX REQUEST:", request.fixes);
-      applyFixes(request);
-      sendResponse({ success: true, message: "Fixes applied! Re-scanning..." });
-
+      applyFixes(request).then(() => {
+        sendResponse({ success: true, message: "AI fixes applied!" });
+      });
+      
     } else {
-      sendResponse({ error: "Unknown action: " + request.action });
+      sendResponse({ error: "Unknown action" });
     }
 
-    return true; // Async response
+    return true; // Keep message channel open for async
   });
 };
 
-// Register immediately
+// 🔥 EXPOSE AI FUNCTIONS TO CONTENT SCRIPT (for popup/App.tsx)
+(window as any).initAI = async () => {
+  // Dynamically import ai.ts in content script context
+  if (!(window as any).generateAltText) {
+    const module = await import(chrome.runtime.getURL('/src/ai.js'));
+    (window as any).initAI = module.initAI;
+    (window as any).generateAltText = module.generateAltText;
+    await module.initAI();
+  }
+};
+
+// Auto-register
 (window as any).registerAccessAIScan();
