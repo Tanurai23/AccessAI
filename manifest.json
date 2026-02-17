@@ -1,34 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "AccessAI Scanner",
+  "name": "AccessAI - AI WCAG Scanner",
   "version": "1.0.0",
-  "description": "AI-powered accessibility auditor with 12 WCAG rules",
-  
-  "permissions": [
-    "tabs",
-    "activeTab",
-    "storage",
-    "scripting"
-  ],
-  
-  "host_permissions": [
-    "<all_urls>"
-  ],
-
+  "description": "AI-powered WCAG scanner + auto-fixes. 12 rules, vision AI alt text, one-click remediation.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["<all_urls>"],
   "action": {
-    "default_popup": "popup/dist/index.html"
+    "default_popup": "index.html",
+    "default_title": "AccessAI"
   },
-
   "content_scripts": [{
     "matches": ["<all_urls>"],
-    "js": ["popup/dist/content.js"],
-    "run_at": "document_idle",
-    "all_frames": false
+    "js": ["content.js"]
   }],
-
   "icons": {
-    "16": "public/icon16.png",
-    "48": "public/icon48.png",
-    "128": "public/icon128.png"
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
   }
 }
