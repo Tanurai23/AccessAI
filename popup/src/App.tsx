@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';  // ✅ FIXED: card.tsx
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Scan, AlertCircle, CheckCircle, Wand2, Loader2 } from 'lucide-react'; // ✅ Loader2 imported
+import { Scan, AlertCircle, CheckCircle, Wand2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useProStatus } from '@/hooks/useProStatus';  // ✅ ADDED
+import { trackUsage } from '@/pro';  // ✅ ADDED
+import { UpgradeCard } from '@/components/ui/UpgradeCard';  // ✅ ADDED
 
 interface AuditIssue {
   id: string;
@@ -20,12 +23,32 @@ const App: React.FC = () => {
   const [audits, setAudits] = useState<AuditIssue[]>([]);
   const [scanning, setScanning] = useState(false);
   const [fixing, setFixing] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);  // ✅ DECLARED HERE
+  const [aiLoading, setAiLoading] = useState(false);
   const [totalIssues, setTotalIssues] = useState(0);
+  const [savedScansCount, setSavedScansCount] = useState(0);  // ✅ NEW: Pro tracking
+  
+  // ✅ PRO STATUS HOOK
+  const { isPro, loading: proLoading } = useProStatus();
+
+  // ✅ LOAD SAVED SCANS COUNT
+  useEffect(() => {
+    chrome.storage.sync.get('savedScans', (result) => {
+      setSavedScansCount(Array.isArray(result.savedScans) ? result.savedScans.length : 0);
+    });
+  }, []);
 
   const startScan = async () => {
+    // ✅ PRO: Track scan usage
+    if (!isPro) {
+      const allowed = await trackUsage('scan');
+      if (!allowed) {
+        toast.error('💎 Pro required for more scans (5/day free)');
+        return;
+      }
+    }
+
     setScanning(true);
-    setAiLoading(true);  // ✅ USED HERE
+    setAiLoading(true);
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const response = await chrome.tabs.sendMessage(tab.id!, { action: 'scan' });
@@ -42,8 +65,42 @@ const App: React.FC = () => {
       toast.error('Scan failed: ' + (error as Error).message);
     } finally {
       setScanning(false);
-      setAiLoading(false);  // ✅ USED HERE
+      setAiLoading(false);
     }
+  };
+
+  const saveCurrentScan = async () => {
+    // ✅ PRO: Check limits + track usage
+    if (!isPro) {
+      const allowed = await trackUsage('save');
+      if (!allowed || savedScansCount >= 3) {
+        toast.error('💎 Pro required for saved scans (3 free max)');
+        return;
+      }
+    }
+
+    if (audits.length === 0) {
+      toast.info('Run a scan first');
+      return;
+    }
+
+    const scanData = {
+      id: crypto.randomUUID(),
+      url: window.location.href,
+      score: Math.max(0, 100 - (totalIssues - audits.filter(a => a.fixed).length) * 4),
+      date: new Date().toISOString(),
+      issues: audits
+    };
+
+    const saved = await chrome.storage.sync.get('savedScans');
+    const scans = Array.isArray(saved.savedScans) ? [...saved.savedScans, scanData] : [scanData];
+    
+    await chrome.storage.sync.set({ savedScans: scans });
+    setSavedScansCount(scans.length);
+    
+    toast.success('💾 Scan Saved!', {
+      description: `${savedScansCount + 1} total`
+    });
   };
 
   const applyFixes = async () => {
@@ -53,7 +110,6 @@ const App: React.FC = () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      // ✅ aiFixable calculated here
       const aiFixable = audits.filter(a => !a.fixed && a.aiSuggestion).length;
       if (aiFixable === 0) {
         toast.info('No AI fixes available');
@@ -86,7 +142,14 @@ const App: React.FC = () => {
 
   const fixedCount = audits.filter(a => a.fixed).length;
   const score = Math.max(0, 100 - (totalIssues - fixedCount) * 4);
-  const aiFixable = audits.filter(a => !a.fixed && a.aiSuggestion).length;  // ✅ DECLARED HERE
+  const aiFixable = audits.filter(a => !a.fixed && a.aiSuggestion).length;
+
+  if (proLoading) {
+    return <div className="w-96 p-6 flex items-center justify-center h-64">
+      <Loader2 className="w-8 h-8 animate-spin text-blue-500 mr-2" />
+      <span>Loading Pro status...</span>
+    </div>;
+  }
 
   return (
     <div className="w-96 p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-[500px]">
@@ -97,7 +160,9 @@ const App: React.FC = () => {
         <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
           AccessAI v2.1
         </h1>
-        <p className="text-sm text-gray-500 mt-1">🤖 Real Vision AI</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {isPro ? '💎 Pro' : 'Free'} • {savedScansCount} saved
+        </p>
       </div>
 
       <Card className="mb-6 shadow-xl">
@@ -111,10 +176,21 @@ const App: React.FC = () => {
           <div className="text-3xl font-bold text-gray-900">{score.toFixed(0)}%</div>
           <Progress value={score} className="mt-2 h-3" />
           <p className="text-sm text-gray-600 mt-2">
-            {totalIssues} total • {aiFixable} AI-fixable • {fixedCount} fixed  {/* ✅ USED HERE */}
+            {totalIssues} total • {aiFixable} AI-fixable • {fixedCount} fixed
           </p>
         </CardContent>
       </Card>
+
+      {/* ✅ PRO: SAVE SCAN BUTTON */}
+      <Button 
+        onClick={saveCurrentScan}
+        disabled={audits.length === 0 || proLoading}
+        variant={isPro ? "default" : "outline"}
+        className="w-full mb-3 font-semibold shadow-md h-11 text-xs"
+        size="sm"
+      >
+        💾 Save Scan {isPro && `(${savedScansCount})`}
+      </Button>
 
       {/* SCAN BUTTON */}
       <Button 
@@ -125,8 +201,8 @@ const App: React.FC = () => {
       >
         {scanning ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />  {/* ✅ IMPORTED */}
-            {aiLoading ? '🤖 AI Analyzing...' : 'Scanning...'}  {/* ✅ USED */}
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            {aiLoading ? '🤖 AI Analyzing...' : 'Scanning...'}
           </>
         ) : (
           <>
@@ -151,10 +227,15 @@ const App: React.FC = () => {
         ) : (
           <>
             <Wand2 className="w-4 h-4 mr-2" />
-            ✨ Apply {aiFixable} AI Fixes  {/* ✅ USED HERE */}
+            ✨ Apply {aiFixable} AI Fixes
           </>
         )}
       </Button>
+
+      {/* ✅ PRO: UPGRADE CARD (shows when limits hit) */}
+      {!isPro && audits.length > 0 && (
+        <UpgradeCard feature="saved scans & unlimited scans" className="mb-4" />
+      )}
 
       {/* Issues List */}
       <div className="space-y-3 max-h-64 overflow-y-auto">

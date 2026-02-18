@@ -1,23 +1,39 @@
-// Free limits
-const FREE_LIMITS = {
-  scans: 5,      // /day
-  saved: 3,      // max saved scans
-  reports: 0     // no PDF exports
-};
+// pro.ts - Fixed TypeScript + chrome.storage types
+interface UsageData {
+  scans: number
+  saves: number
+  exports: number
+}
 
-// Check pro status (Chrome storage + Stripe webhook)
+interface ProData {
+  proUntil?: string | number
+  stripeId?: string
+}
+
+const FREE_LIMITS: Record<string, number> = {
+  scans: 5,
+  saves: 3,
+  exports: 0
+}
+
 export const getProStatus = async (): Promise<'free' | 'pro'> => {
-  const { proUntil, stripeId } = await chrome.storage.sync.get(['proUntil', 'stripeId']);
-  return new Date(proUntil || 0) > new Date() ? 'pro' : 'free';
-};
+  const data = await chrome.storage.sync.get<ProData>(['proUntil', 'stripeId'])
+  const proUntil = data.proUntil ? new Date(data.proUntil as string | number) : new Date(0)
+  return proUntil > new Date() ? 'pro' : 'free'
+}
 
-export const trackUsage = async (action: 'scan' | 'save' | 'export') => {
-  const status = await getProStatus();
-  if (status === 'pro') return true;
+export const trackUsage = async (action: 'scan' | 'save' | 'export'): Promise<boolean> => {
+  const status = await getProStatus()
+  if (status === 'pro') return true
   
-  const usage = await chrome.storage.local.get('usage') || { scans: 0 };
-  usage[action + 's'] = (usage[action + 's'] || 0) + 1;
-  await chrome.storage.local.set(usage);
+  const usageData = await chrome.storage.local.get<UsageData>('usage')
+  const usage = usageData.usage || { scans: 0, saves: 0, exports: 0 }
   
-  return usage[action + 's'] <= FREE_LIMITS[action + 's' as keyof typeof FREE_LIMITS];
-};
+  const count = (usage[action + 's'] || 0) + 1
+  usage[action + 's'] = count
+  
+  await chrome.storage.local.set({ usage })
+  
+  const limit = FREE_LIMITS[action + 's']
+  return typeof limit === 'number' ? count <= limit : false
+}
